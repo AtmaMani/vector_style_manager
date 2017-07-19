@@ -1,0 +1,5 @@
+#ignore files
+.idea
+.DS_Store
+.DS_Store/
+*canvas*
