@@ -7,6 +7,7 @@ import argparse
 from getpass import getpass
 import sys
 import os
+import urllib3
 
 if __name__ == '__main__':
     #region print banner

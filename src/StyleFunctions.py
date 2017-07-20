@@ -100,7 +100,8 @@ def createItem(portalURL, token, username, url2service, metadata_path):
     #add thumbnail
     files = {}
     if thumbnail_path:
-        files = {'file':(open(thumbnail_path, 'rb'), r'image/jpeg')}
+        files = {'file': ('thumbnail.png', open(thumbnail_path, 'rb'))}
+        # files = {'thumbnail':open(thumbnail_path, 'rb')}
 
     # make request
     try:
@@ -116,7 +117,7 @@ def createItem(portalURL, token, username, url2service, metadata_path):
             try:
                 itemID = responseJSON["id"]
                 print("    Item created with id : " + itemID)
-                updateItem_thumbnail(portalURL, token, username, itemID, thumbnail_path)
+                # updateItem_thumbnail(portalURL, token, username, itemID, thumbnail_path)
                 return itemID
             except Exception as additemEx:
                 print("    **Add item call succeeded but item not created")
