@@ -3,8 +3,8 @@
 block_cipher = None
 
 
-a = Analysis(['src/StyleUploader.py'],
-             pathex=['/Users/atma6951/Documents/code/arcgis_desktop/vector_style_manager'],
+a = Analysis(['src\\StyleUploader.py'],
+             pathex=['E:\\code\\arcgis_desktop\\vector_style_manager'],
              binaries=[],
              datas=[],
              hiddenimports=[],
@@ -18,16 +18,11 @@ pyz = PYZ(a.pure, a.zipped_data,
              cipher=block_cipher)
 exe = EXE(pyz,
           a.scripts,
-          exclude_binaries=True,
+          a.binaries,
+          a.zipfiles,
+          a.datas,
           name='StyleUploader',
           debug=False,
           strip=False,
           upx=True,
           console=True )
-coll = COLLECT(exe,
-               a.binaries,
-               a.zipfiles,
-               a.datas,
-               strip=False,
-               upx=True,
-               name='StyleUploader')
