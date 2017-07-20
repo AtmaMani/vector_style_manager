@@ -27,6 +27,7 @@ if __name__ == '__main__':
     #add optional args
     parser.add_argument('-p', '--password', help='Enter admin password. If password is not entered, it will be requested '
                                                  'during runtime')
+    parser.add_argument('-met', '--metadata', help='Metadata foler name', default='metadata')
 
     #parse the args
     args = parser.parse_args()
@@ -76,16 +77,17 @@ if __name__ == '__main__':
         style_path = os.path.join(folderPath, style)
         try:
             itemName = style
-            itemID = createItem(portalURL, token, username, itemName, url2service, style_path)
+            itemID = createItem(portalURL, token, username, url2service,
+                                os.path.join(style_path, args.metadata))
 
             if (itemID):
-                addResources_styles(portalURL, username, token, itemID, folderPath + r'\resources\styles', url2service)
-                addResources_sprites(portalURL, username, token, itemID, folderPath + r'\resources\sprites')
-                addResources_info(portalURL, username, token, itemID, folderPath + r'\resources\info')
-                addResources_fonts(portalURL, username, token, itemID, folderPath + r'\resources\fonts')
-                print('Finished uploading item and its resources')
+                addResources_styles(portalURL, username, token, itemID, os.path.join(folderPath, 'resources','styles'), url2service)
+                addResources_sprites(portalURL, username, token, itemID, os.path.join(folderPath, 'resources', 'sprites'))
+                addResources_info(portalURL, username, token, itemID, os.path.join(folderPath, 'resources','info'))
+                addResources_fonts(portalURL, username, token, itemID, os.path.join(folderPath, 'resources','fonts'))
+                print('  Finished uploading item and its resources')
             else:
-                print("Item cannot be added to portal. Halting script")
+                print("**Item cannot be added to portal. Halting script")
 
         except Exception as style_ex:
             print("  ** Error " + str(style_ex))

@@ -58,43 +58,51 @@ def getToken(portalURL, username, password, referer, expiration=1440):
     response.close()
 
 
-def createItem(portalURL, token, username, itemName, url2service, folderPath):
+def createItem(portalURL, token, username, url2service, metadata_path):
     """
     Will create portal item of Vector Tile Service type.
     :param portalURL: example: http://www.arcgis.com/
     :param token: token obtained using getToken method
     :param username: the username used to get token
-    :param itemName: Name of item to be created online
-    :param folderPath: to folder on disk containing style data
+    :param metadata_path: to folder on disk containing style data
     :return: string - itemID
     """
-    # get Extent and thumbnail
-    # thumbnailPath = os.path.join(folderPath, 'Thumbnail.png')
-    #
-    # with open(os.path.join(folderPath, 'root.json'), 'r') as VTserverfileobj:
-    #     VTServerJSON = json.load(VTserverfileobj)
-    #
-    # try:
-    #     extentJSON  = VTServerJSON["fullExtent"]
-    #     extent = [extentJSON['xmin'], extentJSON['ymin'], extentJSON['xmax'], extentJSON['ymax']]
-    #
-    # except:
-    #     print("  Error reading extent from VectorTileServer json file. Omitting this parameter")
-    #     extent = []
+
+    #region get metadata
+    with open(os.path.join(metadata_path, 'metadata.json'), 'r') as met_handle:
+        met_dict = json.load(met_handle)
+
+    #look for thumbnail file
+    thumbnail_path = None
+    with os.scandir(metadata_path) as it:
+        for entry in it:
+            if entry.is_file():
+                ext = os.path.splitext(entry.name)[-1]
+                if ext in ('.gif', '.jpg', '.jpeg', '.png'):
+                    thumbnail_path =entry.path
+    #endregion
 
     # construct query URL and payload data
     queryURL = portalURL + r"/sharing/rest/content/users/" + username + r"/addItem?f=json"
     query_dict = {'type': 'Vector Tile Service',
-                  'title': itemName,
+                  'title': met_dict['item']['title'],
                   'tags': 'StyleUploader_py',
                   'url': url2service,
-                  # 'extent':extent,
-                  # 'thumbnail':thumbnailPath,
+                  'description':met_dict['item']['description'],
+                  'snippet':met_dict['item']['snippet'],
+                  'extent':",".join(str(j) for i in met_dict['item']['extent'] for j in i),
+                  'accessInformation':met_dict['item']['accessInformation'],
+                  'licenseInfo':met_dict['item']['licenseInfo'],
                   'token': token}
+
+    #add thumbnail
+    files = []
+    if thumbnail_path:
+        files.append(('thumbnail', thumbnail_path, os.path.basename(thumbnail_path)))
 
     # make request
     try:
-        response = requests.post(queryURL, data=query_dict, verify=False)
+        response = requests.post(queryURL, data=query_dict, files=files, verify=False)
     except Exception as restEx:
         print("Exception making addItem call: " + restEx)
         return
@@ -187,7 +195,7 @@ def addResources_sprites(portalURL, username, token, itemID, folderPath):
     :return: null
     """
 
-    print("Uploading sprites")
+    print("    Uploading sprites")
     # construct query url
     queryURL = portalURL + r"/sharing/rest/content/users/" + username + \
                r"/items/" + itemID + r"/addResources?f=json&token=" + token
@@ -203,22 +211,22 @@ def addResources_sprites(portalURL, username, token, itemID, folderPath):
         try:
             response = requests.post(queryURL, files=files, data=data, verify=False)
         except Exception as addResourceEx:
-            print("  Exception making addResource for sprites: " + str(addResourceEx))
+            print("    **Exception making addResource for sprites: " + str(addResourceEx))
             return
 
         if response.status_code == 200:
             try:
                 responseJSON = response.json()
                 if responseJSON["success"]:
-                    print("  Uploaded " + currentFile)
+                    print("    Uploaded " + currentFile)
                 else:
-                    print("  * Error uploading " + currentFile)
-                    print("  * Response message: " + str(responseJSON))
+                    print("    **Error uploading " + currentFile)
+                    print("    **Response message: " + str(responseJSON))
             except:
-                print("  ** addResource response is non JSON: " + str(response.text))
+                print("    **addResource response is non JSON: " + str(response.text))
         else:
-            print("  *** addResource call got non 200 response. File being uploaded: " + currentFile)
-            print("  *** response status code: " + str(response.status_code))
+            print("    ***addResource call got non 200 response. File being uploaded: " + currentFile)
+            print("    ***response status code: " + str(response.status_code))
         response.close()
         # endregion
 
@@ -235,7 +243,7 @@ def addResources_styles(portalURL, username, token, itemID, folderPath, url2serv
     :return: null
     """
 
-    print("Uploading styles/root.json")
+    print("    Uploading styles/root.json")
     # construct query url
     queryURL = portalURL + r"/sharing/rest/content/users/" + username + \
                r"/items/" + itemID + r"/addResources?f=json&token=" + token
@@ -247,10 +255,10 @@ def addResources_styles(portalURL, username, token, itemID, folderPath, url2serv
         styleJSON['sources']['esri']['url'] = url2service
         with open(os.path.join(folderPath, 'root.json'), 'w') as styleFileWriteObj:
             json.dump(styleJSON, styleFileWriteObj)
-        print(r'  URL in styles/root.json updated')
+        print(r'    URL in styles/root.json updated')
     except Exception as styleRWex:
-        print('  Error updating URL of root.json : ' + str(styleRWex))
-        print('  Proceeding to upload file without URL update')
+        print('    **Error updating URL of root.json : ' + str(styleRWex))
+        print('    **Proceeding to upload file without URL update')
     # endregion
 
     files = {'file': open(os.path.join(folderPath, 'root.json'), "rb")}
@@ -259,21 +267,21 @@ def addResources_styles(portalURL, username, token, itemID, folderPath, url2serv
     try:
         response = requests.post(queryURL, files=files, data=data, verify=False)
     except Exception as addResourceEx:
-        print("  Exception making addResource for styles: " + str(addResourceEx))
+        print("    **Exception making addResource for styles: " + str(addResourceEx))
         return
 
     if response.status_code == 200:
         try:
             responseJSON = response.json()
             if responseJSON["success"]:
-                print(r"  Uploaded styles/root.json")
+                print(r"    Uploaded styles/root.json")
             else:
-                print("  * Error uploading styles/root.json")
-                print(r"  * Response message: " + str(responseJSON))
+                print("    **Error uploading styles/root.json")
+                print("    **Response message: " + str(responseJSON))
         except:
-            print("  ** addResource response is non JSON: " + str(response.text))
+            print("    **addResource response is non JSON: " + str(response.text))
     else:
-        print("  *** addResource call got non 200 response : " + str(response.status_code))
+        print("    ***addResource call got non 200 response : " + str(response.status_code))
     response.close()
 
 
@@ -288,7 +296,7 @@ def addResources_info(portalURL, username, token, itemID, folderPath):
     :return: null
     """
 
-    print(r"Uploading info/root.json")
+    print(r"    Uploading info/root.json")
     # construct query url
     queryURL = portalURL + r"/sharing/rest/content/users/" + username + \
                r"/items/" + itemID + r"/addResources?f=json&token=" + token
@@ -299,21 +307,21 @@ def addResources_info(portalURL, username, token, itemID, folderPath):
     try:
         response = requests.post(queryURL, files=files, data=data, verify=False)
     except Exception as addResourceEx:
-        print("  Exception making addResource for info: " + str(addResourceEx))
+        print("    **Exception making addResource for info: " + str(addResourceEx))
         return
 
     if response.status_code == 200:
         try:
             responseJSON = response.json()
             if responseJSON["success"]:
-                print(r"  Uploaded info/root.json")
+                print(r"    Uploaded info/root.json")
             else:
-                print("  * Error uploading info/root.json")
-                print(r"  * Response message: " + str(responseJSON))
+                print("    * Error uploading info/root.json")
+                print(r"    * Response message: " + str(responseJSON))
         except:
-            print("  ** addResource response is non JSON: " + str(response.text))
+            print("    ** addResource response is non JSON: " + str(response.text))
     else:
-        print("  *** addResource call got non 200 response : " + str(response.status_code))
+        print("    *** addResource call got non 200 response : " + str(response.status_code))
     response.close()
 
 
@@ -336,8 +344,8 @@ def addResources_fonts(portalURL, username, token, itemID, folderPath):
     fontFileList = [os.path.join(dirpath, filtered_files)
                     for dirpath, dirname, files in os.walk(folderPath)
                     for filtered_files in fnmatch.filter(files, '*.pbf')]
-    print('Uploading fonts')
-    print('  Found ' + str(len(fontFileList)) + ' font files')
+    print('    Uploading fonts')
+    print('    Found ' + str(len(fontFileList)) + ' font files')
 
     # Now for each font file, find the folder hierarchy. Create appropriate
     # prefixes during upload
@@ -358,7 +366,7 @@ def addResources_fonts(portalURL, username, token, itemID, folderPath):
         try:
             response = requests.post(queryURL, files=files, data=data, verify=False)
         except Exception as addResourceEx:
-            print("  *Exception making addResource for sprites: " + str(addResourceEx))
+            print("    **Exception making addResource for sprites: " + str(addResourceEx))
             response.close()
             return
 
@@ -366,19 +374,19 @@ def addResources_fonts(portalURL, username, token, itemID, folderPath):
             try:
                 responseJSON = response.json()
                 if responseJSON["success"]:
-                    print("  Uploaded " + leftStrippedPath)
+                    print("     Uploaded " + leftStrippedPath)
                 else:
-                    print("  * Error uploading " + leftStrippedPath)
-                    print("  * Response message: " + str(responseJSON))
+                    print("    * Error uploading " + leftStrippedPath)
+                    print("    * Response message: " + str(responseJSON))
             except Exception as deserializeEx:
-                print("  ** addResource response is non JSON: " + str(response.text))
+                print("    ** addResource response is non JSON: " + str(response.text))
         else:
-            print("  *** addResource call got non 200 response. File being uploaded: " + currentFile)
+            print("    *** addResource call got non 200 response. File being uploaded: " + currentFile)
 
         uploadedFileCount = uploadedFileCount + 1
         response.close()
 
-    print('  Fonts - total files on disk: ' + str(len(fontFileList)) +
+    print('    Fonts - total files on disk: ' + str(len(fontFileList)) +
           '. Number of files uploaded: ' + str(uploadedFileCount))
     # endregion
 
