@@ -74,12 +74,13 @@ def createItem(portalURL, token, username, url2service, metadata_path):
 
     #look for thumbnail file
     thumbnail_path = None
-    with os.scandir(metadata_path) as it:
-        for entry in it:
-            if entry.is_file():
-                ext = os.path.splitext(entry.name)[-1]
-                if ext in ('.gif', '.jpg', '.jpeg', '.png'):
-                    thumbnail_path =entry.path
+    thumbnail_name = None
+    for directory, subdir_list, file_list in os.walk(metadata_path):
+        for file in file_list:
+            ext = os.path.splitext(file)[-1]
+            if ext in ('.gif', '.jpg', '.jpeg', '.png'):
+                thumbnail_path =os.path.join(directory, file)
+                thumbnail_name = file
     #endregion
 
     # construct query URL and payload data
@@ -93,18 +94,19 @@ def createItem(portalURL, token, username, url2service, metadata_path):
                   'extent':",".join(str(j) for i in met_dict['item']['extent'] for j in i),
                   'accessInformation':met_dict['item']['accessInformation'],
                   'licenseInfo':met_dict['item']['licenseInfo'],
+                  'thumbnail':"thumbnail/" + thumbnail_name,
                   'token': token}
 
     #add thumbnail
-    files = []
+    files = {}
     if thumbnail_path:
-        files.append(('thumbnail', thumbnail_path, os.path.basename(thumbnail_path)))
+        files = {'file':(open(thumbnail_path, 'rb'), r'image/jpeg')}
 
     # make request
     try:
         response = requests.post(queryURL, data=query_dict, files=files, verify=False)
     except Exception as restEx:
-        print("Exception making addItem call: " + restEx)
+        print("    **Exception making addItem call: " + str(restEx))
         return
 
     # check if succeeded
@@ -113,15 +115,16 @@ def createItem(portalURL, token, username, url2service, metadata_path):
             responseJSON = response.json()
             try:
                 itemID = responseJSON["id"]
-                print("Item created with id : " + itemID)
+                print("    Item created with id : " + itemID)
+                updateItem_thumbnail(portalURL, token, username, itemID, thumbnail_path)
                 return itemID
             except Exception as additemEx:
-                print("Add item call succeeded but item not created")
-                print("response: " + response.text)
+                print("    **Add item call succeeded but item not created")
+                print("    **response: " + response.text)
         except:
-            print("Add Item response was non json: " + response.text)
+            print("    **Add Item response was non json: " + response.text)
     else:
-        print('Add Item call resulted in non 200 response: ' + str(response.status_code))
+        print('    **Add Item call resulted in non 200 response: ' + str(response.status_code))
     response.close()
 
 
@@ -141,6 +144,44 @@ def fixRelativePaths(stylejson_dict):
     except:
         print('Region: fixRelativePaths. Elements sprite / glyphs not found in JSON')
 
+def updateItem_thumbnail(portalURL, token, username, itemID, thumbnail_path):
+    """
+    Will add root.json to itemID/data resource
+    :param portalURL: example: http://www.arcgis.com/
+    :param token: token obtained using getToken method
+    :param username: the username used to get token
+    :param itemID: Item Id obtained from createItem method
+    :param folderPath: to folder on disk containing style data
+    :return: string - itemID
+    """
+    # construct query URL
+    queryURL = portalURL + r"/sharing/rest/content/users/" + username + \
+               r"/items/" + itemID + r"/update?f=json"
+
+    # read data
+    files = {'file':open(thumbnail_path, 'rb')}
+    query_dict = {'token': token}
+
+    # make request
+    try:
+        response = requests.post(queryURL, data=query_dict, files=files, verify=False)
+    except Exception as restEx:
+        print("Exception making addItem call: " + restEx)
+        return
+
+    # check if succeeded
+    if response.status_code == 200:
+        try:
+            responseJSON = response.json()
+            try:
+                if (responseJSON["success"]):
+                    print("    Item updated")
+                    return
+            except Exception as additemEx:
+                print("Add item call succeeded but item not created")
+                print("response: " + response.text)
+        except:
+            print("Add Item response was non json: " + response.text)
 
 def updateItem(portalURL, token, username, itemID, folderPath):
     """
@@ -205,7 +246,7 @@ def addResources_sprites(portalURL, username, token, itemID, folderPath):
     for currentFile in fileList:
         if (currentFile.__contains__('.db')): #Exclude hidden files created by Windows OS
             continue
-        files = {'file': open(folderPath + r'\\' + currentFile, "rb")}
+        files = {'file': open(os.path.join(folderPath , currentFile), "rb")}
         data = {'resourcesPrefix': 'sprites'}
 
         try:

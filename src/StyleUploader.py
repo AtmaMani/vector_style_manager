@@ -47,6 +47,7 @@ if __name__ == '__main__':
     referer = r'https://www.arcgis.com'
 
     folderPath = args.folder_path
+    print(folderPath)
     url2service = args.service_url
 
     print('Connecting to ArcGIS Enterprise', end=" : ")
@@ -63,10 +64,10 @@ if __name__ == '__main__':
     #region scan for styles
     print('Scanning for styles ', end=" : ")
     folder_list = []
-    with os.scandir(folderPath) as it:
-        for entry in it:
-            if not entry.name.startswith('.') and not entry.is_file():
-                folder_list.append(entry.name)
+    it = os.listdir(folderPath)
+    for entry in it:
+        if not entry.startswith('.'):
+            folder_list.append(entry)
     print("found {} styles".format(str(len(folder_list))))
     #endregion
 
@@ -81,10 +82,10 @@ if __name__ == '__main__':
                                 os.path.join(style_path, args.metadata))
 
             if (itemID):
-                addResources_styles(portalURL, username, token, itemID, os.path.join(folderPath, 'resources','styles'), url2service)
-                addResources_sprites(portalURL, username, token, itemID, os.path.join(folderPath, 'resources', 'sprites'))
-                addResources_info(portalURL, username, token, itemID, os.path.join(folderPath, 'resources','info'))
-                addResources_fonts(portalURL, username, token, itemID, os.path.join(folderPath, 'resources','fonts'))
+                addResources_styles(portalURL, username, token, itemID, os.path.join(style_path, 'resources','styles'), url2service)
+                addResources_sprites(portalURL, username, token, itemID, os.path.join(style_path, 'resources', 'sprites'))
+                addResources_info(portalURL, username, token, itemID, os.path.join(style_path, 'resources','info'))
+                addResources_fonts(portalURL, username, token, itemID, os.path.join(style_path, 'resources','fonts'))
                 print('  Finished uploading item and its resources')
             else:
                 print("**Item cannot be added to portal. Halting script")
