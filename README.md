@@ -20,6 +20,10 @@ conda install requests
 pip install pyinstaller
 conda install urllib3
 ```
+If your development env is Windows, then install `pypiwin32`
+```
+pip install pypiwin32
+```
 Then clone this project using the command
 ```
 git clone https://github.com/atmamani/vector_style_manager.git
