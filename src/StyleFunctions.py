@@ -1,3 +1,5 @@
+import uuid
+
 __author__ = 'atma6951'
 __date__ = ''
 # NOTE: This script has dependency: Python 3.4 and requests library
@@ -10,7 +12,18 @@ import pathlib
 import json
 import fnmatch
 import requests
+import mimetypes
 import requests.packages.urllib3 as urllib3
+import shutil
+import io
+from io import StringIO
+from io import BytesIO
+from urllib import request as rq
+
+import six
+from six.moves.urllib_parse import urlencode, urlsplit
+
+
 
 # Prevent certificate warnings
 urllib3.disable_warnings()
@@ -117,7 +130,7 @@ def createItem(portalURL, token, username, url2service, metadata_path):
             try:
                 itemID = responseJSON["id"]
                 print("    Item created with id : " + itemID)
-                # updateItem_thumbnail(portalURL, token, username, itemID, thumbnail_path)
+                resp = updateItem_thumbnail(portalURL, token, username, itemID, thumbnail_path)
                 return itemID
             except Exception as additemEx:
                 print("    **Add item call succeeded but item not created")
@@ -160,29 +173,12 @@ def updateItem_thumbnail(portalURL, token, username, itemID, thumbnail_path):
                r"/items/" + itemID + r"/update?f=json"
 
     # read data
-    files = {'file':open(thumbnail_path, 'rb')}
-    query_dict = {'token': token}
+    files = []
+    files.append(('thumbnail', thumbnail_path, os.path.basename(thumbnail_path)))
 
-    # make request
-    try:
-        response = requests.post(queryURL, data=query_dict, files=files, verify=False)
-    except Exception as restEx:
-        print("Exception making addItem call: " + restEx)
-        return
-
-    # check if succeeded
-    if response.status_code == 200:
-        try:
-            responseJSON = response.json()
-            try:
-                if (responseJSON["success"]):
-                    print("    Item updated")
-                    return
-            except Exception as additemEx:
-                print("Add item call succeeded but item not created")
-                print("response: " + response.text)
-        except:
-            print("Add Item response was non json: " + response.text)
+    resp = post(path=queryURL, token=token, postdata=None, files = files)
+    if resp:
+        return resp.get('success')
 
 def updateItem(portalURL, token, username, itemID, folderPath):
     """
@@ -886,3 +882,303 @@ def deleteResources_fromPortalItem(itemID, portalURL, token, username, update_fo
 #Retun timestamp
 def getTimeStamp():
     return dt.now().__str__()
+
+def post(path, token, postdata=None, files=None, ssl=False, compress=True,
+         is_retry=False, use_ordered_dict=False, add_token=True, verify_cert=True,
+         try_json=True, out_folder=None,
+         file_name=None, force_bytes=False, add_headers=None):
+
+    """ Returns result of an HTTP POST. Supports Multipart requests."""
+    # prevent double encoding
+
+    url = path
+    if postdata is None:
+        postdata = {}
+
+    if token is not None:
+        postdata['token'] = token
+    else:
+        pass # no token, public access
+
+    # If there are files present, send a multipart request
+    if files:
+        #parsed_url = urlparse(url)
+        mpf = MultiPartForm(param_dict=postdata, files=files)
+
+        req = rq.Request(url)
+        body = mpf.make_result
+        req.add_header('User-agent', 'gd_vsm')
+        req.add_header('Content-type', mpf.get_content_type())
+        req.add_header('Content-length', len(body))
+        if isinstance(add_headers, list):
+            for ah in add_headers:
+                req.add_header(ah[0], ah[1])
+        req.data = body
+        headers = [('Referer', "http"),
+                   ('User-Agent', "gd_vsm"),
+                   ('Content-type', mpf.get_content_type()),
+                   ('Content-length', len(body))]
+        if isinstance(add_headers, list):
+            for ah in add_headers:
+                headers.append(ah)
+        if compress:
+            headers.append(('Accept-encoding', 'gzip'))
+
+        handlers = get_handlers(verify_cert)
+        opener = rq.build_opener(*handlers)
+
+        opener.addheaders = headers
+
+        resp = opener.open(req)
+        resp_data, is_file = _process_response(resp,
+                                           out_folder=out_folder,
+                                           file_name=file_name,
+                                           force_bytes=force_bytes)
+    # Otherwise send a normal HTTP POST request
+    else:
+        encoded_postdata = None
+        if postdata:
+            encoded_postdata = urlencode(postdata)
+        headers = [('Referer', 'http'),
+                   ('User-Agent', 'gd_vsm')]
+        if compress:
+            headers.append(('Accept-encoding', 'gzip'))
+
+        handlers = get_handlers(verify_cert)
+        opener = rq.build_opener(*handlers)
+
+        opener.addheaders = headers
+        #print("***"+url)
+        resp = opener.open(url, data=encoded_postdata.encode())
+        resp_data, is_file = _process_response(resp,
+                                           out_folder=out_folder,
+                                           file_name=file_name,
+                                           force_bytes=force_bytes)
+
+    # Parse the response into JSON
+
+    # print(resp_data)
+
+    # If is a file or we're not trying to parse to JSON, return response as is
+    if is_file or not try_json:
+        return resp_data
+
+    if use_ordered_dict:
+        resp_json = json.loads(resp_data)
+    else:
+        resp_json = json.loads(resp_data)
+
+    return resp_json
+
+class MultiPartForm(object):
+    """Accumulate the data to be used when posting a form."""
+    import sys
+    PY2 = sys.version_info[0] == 2
+    PY3 = sys.version_info[0] == 3
+    files = []
+    form_fields = []
+    boundary = None
+    form_data = ""
+    #----------------------------------------------------------------------
+    def __init__(self, param_dict=None, files=None):
+        if param_dict is None:
+            param_dict = {}
+        if files is None:
+            files = {}
+        self.boundary = None
+        self.files = []
+        self.form_data = ""
+        if len(self.form_fields) > 0:
+            self.form_fields = []
+
+        if len(param_dict) == 0:
+            self.form_fields = []
+        else:
+            for k,v in param_dict.items():
+                self.form_fields.append((k,v))
+                del k,v
+        if isinstance(files, list):
+            if len(files) == 0:
+                self.files = []
+            else:
+                for key, filePath, fileName in files:
+                    self.add_file(fieldname=key,
+                                  filename=fileName,
+                                  filePath=filePath,
+                                  mimetype=None)
+        elif isinstance(files, dict):
+            for key, filepath in files.items():
+                self.add_file(fieldname=key,
+                              filename=os.path.basename(filepath),
+                              filePath=filepath,
+                              mimetype=None)
+                del key, filepath
+        self.boundary = "%s" % self._make_boundary()
+    #----------------------------------------------------------------------
+    def get_content_type(self):
+        return 'multipart/form-data; boundary=%s' % self.boundary
+    #----------------------------------------------------------------------
+    def add_field(self, name, value):
+        """Add a simple field to the form data."""
+        self.form_fields.append((name, value))
+    #----------------------------------------------------------------------
+    def _make_boundary(self):
+        """ creates a boundary for multipart post (form post)"""
+        if six.PY2:
+            return '----------------%s--' % uuid.uuid4().hex
+        elif six.PY3:
+            return '----------------%s--' % uuid.uuid4().hex
+        else:
+            from random import choice
+            digits = "0123456789"
+            letters = "abcdefghijklmnopqrstuvwxyz"
+            return '----------------%s--'.join(choice(letters + digits) \
+                                   for i in range(15))
+    #----------------------------------------------------------------------
+    def add_file(self, fieldname, filename, filePath, mimetype=None):
+        """Add a file to be uploaded.
+        Inputs:
+           fieldname - name of the POST value
+           fieldname - name of the file to pass to the server
+           filePath - path to the local file on disk
+           mimetype - MIME stands for Multipurpose Internet Mail Extensions.
+             It's a way of identifying files on the Internet according to
+             their nature and format. Default is None.
+        """
+        body = filePath
+        if mimetype is None:
+            mimetype = mimetypes.guess_type(filename)[0] or 'application/octet-stream'
+        self.files.append((fieldname, filename, mimetype, body))
+    #----------------------------------------------------------------------
+    @property
+    def make_result(self):
+        if self.PY2:
+            self._2()
+        elif self.PY3:
+            self._3()
+        return self.form_data
+    #----------------------------------------------------------------------
+    def _2(self):
+        """python 2.x version of formatting body data"""
+        boundary = self.boundary
+        buf = StringIO()
+        for (key, value) in self.form_fields:
+            buf.write('--%s\r\n' % boundary)
+            buf.write('Content-Disposition: form-data; name="%s"' % key)
+            buf.write('\r\n\r\n%s\r\n' % value)
+        for (key, filename, mimetype, filepath) in self.files:
+            if os.path.isfile(filepath):
+                buf.write('--{boundary}\r\n'
+                          'Content-Disposition: form-data; name="{key}"; '
+                          'filename="{filename}"\r\n'
+                          'Content-Type: {content_type}\r\n\r\n'.format(
+                              boundary=boundary,
+                              key=key,
+                              filename=filename,
+                              content_type=mimetype))
+                with open(filepath, "rb") as f:
+                    shutil.copyfileobj(f, buf)
+                buf.write('\r\n')
+        buf.write('--' + boundary + '--\r\n\r\n')
+        buf = buf.getvalue()
+        self.form_data = buf
+    #----------------------------------------------------------------------
+    def _3(self):
+        """ python 3 method"""
+        boundary = self.boundary
+        buf = BytesIO()
+        textwriter = io.TextIOWrapper(
+            buf, 'utf8', newline='', write_through=True)
+
+        for (key, value) in self.form_fields:
+            textwriter.write(
+                '--{boundary}\r\n'
+                'Content-Disposition: form-data; name="{key}"\r\n\r\n'
+                '{value}\r\n'.format(
+                    boundary=boundary, key=key, value=value))
+        for(key, filename, mimetype, filepath) in self.files:
+            if os.path.isfile(filepath):
+                textwriter.write(
+                    '--{boundary}\r\n'
+                    'Content-Disposition: form-data; name="{key}"; '
+                    'filename="{filename}"\r\n'
+                    'Content-Type: {content_type}\r\n\r\n'.format(
+                        boundary=boundary, key=key, filename=filename,
+                        content_type=mimetype))
+                with open(filepath, "rb") as f:
+                    shutil.copyfileobj(f, buf)
+                textwriter.write('\r\n')
+        textwriter.write('--{}--\r\n\r\n'.format(boundary))
+        self.form_data = buf.getvalue()
+
+def get_handlers(verify_cert=True):
+    handlers = []
+    passman = rq.HTTPPasswordMgrWithDefaultRealm()
+    # passman.add_password(None,
+    #                      self._parsed_org_url,
+    #                      self._username,
+    #                      self._password)
+    handlers.append(rq.HTTPHandler)
+    # handlers.append(rq.HTTPBasicAuthHandler(passman))
+
+    return handlers
+
+def _process_response(resp, out_folder=None,  file_name=None, force_bytes=False):
+    """ processes the response object"""
+    CHUNK = 4056
+    maintype = self._mainType(resp)
+    contentDisposition = resp.headers.get('content-disposition')
+    contentType = resp.headers.get('content-type')
+    contentLength = resp.headers.get('content-length')
+    if not force_bytes and \
+       (maintype.lower() in ('image', 'application/x-zip-compressed') or \
+        contentType == 'application/x-zip-compressed' or \
+       (contentDisposition is not None and contentDisposition.lower().find('attachment;') > -1)):
+        fname = self._get_file_name(contentDisposition=contentDisposition, url=resp.geturl()).split('?')[0]
+        if out_folder is None:
+            out_folder = tempfile.gettempdir()
+        if contentLength is not None:
+            max_length = int(contentLength)
+            if max_length < CHUNK:
+                CHUNK = max_length
+        if file_name is None:
+            file_name = os.path.join(out_folder, fname)
+        else:
+            file_name = os.path.join(out_folder, file_name)
+        with open(file_name, 'wb') as writer:
+            for data in self._chunk(response=resp):
+                writer.write(data)
+                del data
+            del writer
+        return file_name, True
+    else:
+        read = ""
+        if file_name and out_folder:
+            f_n_path = os.path.join(out_folder, file_name)
+            with open(f_n_path, 'wb') as writer:
+                for data in self._chunk(response=resp, size=4096):
+                    writer.write(data)
+                    del data
+                writer.flush()
+                del writer
+            return f_n_path, True
+        else:
+            for data in self._chunk(response=resp, size=4096):
+                if six.PY3 == True:
+                    if read == "":
+                        read = data
+                    else:
+                        read += data
+                else:
+                    read += data
+                del data
+        if six.PY3 and len(read) > 0:
+            try:
+                read = read.decode("utf-8").strip()
+            except:
+                pass
+        try:
+            return read.strip(), False
+        except:
+            return read, False
+    return "", False
