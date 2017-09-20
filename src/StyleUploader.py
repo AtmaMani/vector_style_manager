@@ -29,6 +29,7 @@ if __name__ == '__main__':
     parser.add_argument('-p', '--password', help='Enter admin password. If password is not entered, it will be requested '
                                                  'during runtime')
     parser.add_argument('-met', '--metadata', help='Metadata foler name', default='metadata')
+    parser.add_argument('-pub', '--public', help='Make Items public?', default='true')
 
     #parse the args
     args = parser.parse_args()

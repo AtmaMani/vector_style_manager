@@ -275,7 +275,8 @@ def addResources_sprites(portalURL, username, token, itemID, folderPath):
 
 def addResources_styles(portalURL, username, token, itemID, folderPath, url2service):
     """
-    Will upload resources from styles directory
+    Will upload resources from styles directory. The url property will be replaced with that passed in the parameter.
+    New - the url to glyph and sprite kvp will be replaced to absolute paths instead of relative.
     :param portalURL: Same URL used to get Token and create item
     :param username: Username used to get Token
     :param token: Token obtained from getToken method
@@ -290,14 +291,25 @@ def addResources_styles(portalURL, username, token, itemID, folderPath, url2serv
     queryURL = portalURL + r"/sharing/rest/content/users/" + username + \
                r"/items/" + itemID + r"/addResources?f=json&token=" + token
 
-    # region Update url property in styles/root.json
+    # region Update url properties in styles/root.json
     with open(os.path.join(folderPath, 'root.json'), 'r') as styleFileReadObj:
         styleJSON = json.load(styleFileReadObj)
     try:
         styleJSON['sources']['esri']['url'] = url2service
+
+        #replace sprite path
+        original_sprite_path = styleJSON['sprite']
+        styleJSON['sprite'] = portalURL + r'/sharing/rest/content/items/' + itemID + \
+                              r'/resources/' + original_sprite_path.split(".")[-1]
+
+        #replace glyph path
+        original_glyph_path = styleJSON['glyphs']
+        glyph_splitted=original_sprite_path.split(".")
+        styleJSON['glyphs'] = url2service + r'/resources/' + glyph_splitted[-2] + "." + glyph_splitted[-1]
+
         with open(os.path.join(folderPath, 'root.json'), 'w') as styleFileWriteObj:
             json.dump(styleJSON, styleFileWriteObj)
-        print(r'    URL in styles/root.json updated')
+        print(r'    URLs in styles/root.json updated')
     except Exception as styleRWex:
         print('    **Error updating URL of root.json : ' + str(styleRWex))
         print('    **Proceeding to upload file without URL update')
