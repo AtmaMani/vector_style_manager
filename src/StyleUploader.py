@@ -33,6 +33,10 @@ if __name__ == '__main__':
 
     #parse the args
     args = parser.parse_args()
+
+    make_public = False
+    if args.public == 'true' or args.public == 'True':
+        make_public = True
     #endregion
 
     #region establish connection to AGS Enterprise
@@ -81,7 +85,7 @@ if __name__ == '__main__':
         try:
             itemName = style
             itemID = createItem(portalURL, token, username, url2service,
-                                os.path.join(style_path, args.metadata))
+                                os.path.join(style_path, args.metadata), make_public)
 
             if (itemID):
                 addResources_styles(portalURL, username, token, itemID, os.path.join(style_path, 'resources','styles'), url2service)

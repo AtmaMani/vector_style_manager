@@ -58,13 +58,14 @@ def getToken(portalURL, username, password, referer, expiration=1440):
     response.close()
 
 
-def createItem(portalURL, token, username, url2service, metadata_path):
+def createItem(portalURL, token, username, url2service, metadata_path, make_public=False):
     """
     Will create portal item of Vector Tile Service type.
     :param portalURL: example: http://www.arcgis.com/
     :param token: token obtained using getToken method
     :param username: the username used to get token
     :param metadata_path: to folder on disk containing style data
+    :param make_public: if True, items will be shared to everyone
     :return: string - itemID
     """
 
@@ -106,6 +107,7 @@ def createItem(portalURL, token, username, url2service, metadata_path):
     # make request
     try:
         response = requests.post(queryURL, data=query_dict, files=files, verify=False)
+
     except Exception as restEx:
         print("    **Exception making addItem call: " + str(restEx))
         return
@@ -118,6 +120,14 @@ def createItem(portalURL, token, username, url2service, metadata_path):
                 itemID = responseJSON["id"]
                 print("    Item created with id : " + itemID)
                 # updateItem_thumbnail(portalURL, token, username, itemID, thumbnail_path)
+
+                if make_public:
+                    queryURL2 = portalURL + r"/sharing/rest/content/users/" + username + r"/items/" + itemID + r"/share?f=json"
+                    query_dict2={'everyone':True,
+                                 'token':token}
+                    response2 = requests.post(queryURL2, data=query_dict2, verify=False)
+                    print("    Item shared with public")
+
                 return itemID
             except Exception as additemEx:
                 print("    **Add item call succeeded but item not created")
@@ -300,12 +310,19 @@ def addResources_styles(portalURL, username, token, itemID, folderPath, url2serv
         #replace sprite path
         original_sprite_path = styleJSON['sprite']
         styleJSON['sprite'] = portalURL + r'/sharing/rest/content/items/' + itemID + \
-                              r'/resources/' + original_sprite_path.split(".")[-1]
+                              r'/resources' + r"/sprites/sprite"
+
+        #i decided to hard code the suffix.
+        # styleJSON['sprite'] = portalURL + r'/sharing/rest/content/items/' + itemID + \
+        #                       r'/resources' + original_sprite_path.split(".")[-1]
 
         #replace glyph path
         original_glyph_path = styleJSON['glyphs']
-        glyph_splitted=original_sprite_path.split(".")
-        styleJSON['glyphs'] = url2service + r'/resources/' + glyph_splitted[-2] + "." + glyph_splitted[-1]
+        glyph_splitted=original_glyph_path.split(".")
+        styleJSON['glyphs'] = url2service + r'/resources' + r"/fonts/{fontstack}/{range}.pbf"
+
+        #i decided to hard code the suffix instead of getting it from existing file.
+        # styleJSON['glyphs'] = url2service + r'/resources' + glyph_splitted[-2] + "." + glyph_splitted[-1]
 
         with open(os.path.join(folderPath, 'root.json'), 'w') as styleFileWriteObj:
             json.dump(styleJSON, styleFileWriteObj)
