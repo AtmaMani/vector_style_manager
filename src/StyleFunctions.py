@@ -88,6 +88,13 @@ def createItem(portalURL, token, username, url2service, metadata_path, make_publ
     # construct query URL and payload data
     queryURL = portalURL + r"/sharing/rest/content/users/" + username + r"/addItem?f=json"
     met_tags = reduce((lambda x,y: x+","+y), met_dict['item']['tags'])
+
+    #construct thumbnail url parameter
+    try:
+        thumbnail_url = portalURL + r"/sharing/rest/content/items/" + met_dict['item']['thumbnailItemId']
+    except:
+        thumbnail_url = r'invlaid_url'
+
     query_dict = {'type': 'Vector Tile Service',
                   'title': met_dict['item']['title'],
                   'tags': met_tags,
@@ -97,7 +104,7 @@ def createItem(portalURL, token, username, url2service, metadata_path, make_publ
                   'extent':",".join(str(j) for i in met_dict['item']['extent'] for j in i),
                   'accessInformation':met_dict['item']['accessInformation'],
                   'licenseInfo':met_dict['item']['licenseInfo'],
-                  'thumbnail':r"http://dev005219.esri.com/portal/sharing/rest/content/items/93cb31351e604a7ea65f9628eb522210/info/thumbnail/thumbnail.JPEG",
+                  'thumbnailurl':thumbnail_url,
                   'token': token}
 
     #add thumbnail
@@ -108,7 +115,8 @@ def createItem(portalURL, token, username, url2service, metadata_path, make_publ
 
     # make request
     try:
-        response = requests.post(queryURL, data=query_dict, files=files, verify=False)
+        # response = requests.post(queryURL, data=query_dict, files=files, verify=False)
+        response = requests.post(queryURL, data=query_dict, verify=False)
 
     except Exception as restEx:
         print("    **Exception making addItem call: " + str(restEx))
