@@ -11,6 +11,7 @@ import json
 import fnmatch
 import requests
 import requests.packages.urllib3 as urllib3
+from functools import reduce
 
 # Prevent certificate warnings
 urllib3.disable_warnings()
@@ -86,16 +87,17 @@ def createItem(portalURL, token, username, url2service, metadata_path, make_publ
 
     # construct query URL and payload data
     queryURL = portalURL + r"/sharing/rest/content/users/" + username + r"/addItem?f=json"
+    met_tags = reduce((lambda x,y: x+","+y), met_dict['item']['tags'])
     query_dict = {'type': 'Vector Tile Service',
                   'title': met_dict['item']['title'],
-                  'tags': 'StyleUploader_py',
+                  'tags': met_tags,
                   'url': url2service,
                   'description':met_dict['item']['description'],
                   'snippet':met_dict['item']['snippet'],
                   'extent':",".join(str(j) for i in met_dict['item']['extent'] for j in i),
                   'accessInformation':met_dict['item']['accessInformation'],
                   'licenseInfo':met_dict['item']['licenseInfo'],
-                  'thumbnail':"thumbnail/" + thumbnail_name,
+                  'thumbnail':r"http://dev005219.esri.com/portal/sharing/rest/content/items/93cb31351e604a7ea65f9628eb522210/info/thumbnail/thumbnail.JPEG",
                   'token': token}
 
     #add thumbnail
