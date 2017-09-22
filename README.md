@@ -6,10 +6,10 @@ with ArcGIS Data Appliance device to publish new Vector Tile Style items.
 ### Stand-alone version on Windows
 The tool accepts command line args. The `password` is optional. If you don't specify as command line arg, then the tool will ask for it during runtime. Running this tool in `help` mode prints the following
 ```
-λ StyleUploader.exe -h
+λ StylePublisher.exe -h
 =========================================================================================
 =================================ESRI VECTOR STYLE MANAGER===============================
-usage: StyleUploader.exe [-h] [-p PASSWORD] [-met METADATA] [-pub PUBLIC]
+usage: StylePublisher.exe [-h] [-p PASSWORD] [-met METADATA] [-pub PUBLIC]
                          portalurl username service_url folder_path
 
 positional arguments:
@@ -35,8 +35,8 @@ optional arguments:
 
 ### Stand-alone version on Windows with all arguments
 ```
-E:\code\arcgis_desktop\vector_style_manager\dist\StyleUploader (master)                                             
-λ StyleUploader.exe https://dev005219.esri.com/portal admin https://dev0000585.esri.com/server/rest/services/Hosted/
+E:\code\arcgis_desktop\vector_style_manager\dist\StylePublisher (master)                                             
+λ StylePublisher.exe https://dev005219.esri.com/portal admin https://dev0000585.esri.com/server/rest/services/Hosted/
 World_basemap_v2017R15_wmas/VectorTileServer E:\code\arcgis_desktop\vector_style_manager\sample_styles -pub True    
 =========================================================================================                           
 =================================ESRI VECTOR STYLE MANAGER===============================                           
