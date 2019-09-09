@@ -1,5 +1,5 @@
 # vector_style_manager
-This is a stand-alone Python based command line tool to manage ArcGIS vector styles. This tool is intended to be shipped 
+This is a stand-alone Python based command-line tool to manage ArcGIS vector styles. This tool is intended to be shipped 
 with ArcGIS Data Appliance device to publish new Vector Tile Style items.
 
 ## Dependencies to be installed
